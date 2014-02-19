@@ -16,7 +16,8 @@ libraryDependencies ++= List(
   "com.netflix.rxjava" % "rxjava-core" % "0.17.0-RC2" intransitive(),
   "com.netflix.rxjava" % "rxjava-string" % "0.17.0-RC2" intransitive(),
   "com.typesafe.akka"      %% "akka-contrib" % "2.2.1" intransitive(),
-  "com.typesafe.akka"      %% "akka-actor"   % "2.2.1"
+  "com.typesafe.akka"      %% "akka-actor"   % "2.2.1",
+  "junit" % "junit" % "4.11" % "test"
 )
 
 ideaExcludeFolders ++= Seq(".idea", ".idea_modules")
