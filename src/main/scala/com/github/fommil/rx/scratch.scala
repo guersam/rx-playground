@@ -1,15 +1,21 @@
 package com.github.fommil.rx
 
-import java.io.{FileReader, FileWriter, File}
+import java.io.{FileWriter, File}
 import scala.concurrent.{Future, ExecutionContext}
 import java.util.concurrent.{CountDownLatch, Semaphore}
-import com.google.common.base.Stopwatch
+import com.google.common.base.{Charsets, Stopwatch}
 import akka.contrib.jul.JavaLogging
 import scala.io.Source
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
+import java.util.concurrent.atomic.AtomicLong
 import ExecutionContext.Implicits.global
 import GenerateData.rows
-import rx.Observer
+import com.google.common.io.Files
+import rx.lang.scala.JavaConversions
+import Files.newReader
+import Charsets.UTF_8
+import JavaConversions._
+import rx.observables.StringObservable._
+
 
 object Scratch extends App with GenerateData with JavaLogging {
 
@@ -22,10 +28,6 @@ object Scratch extends App with GenerateData with JavaLogging {
   val file = new File("data.csv")
   generate(file)
 
-  timed("observable") {
-    new ObservableParser(file).parse()
-  }
-
   timed("single threaded") {
     new SingleThreadParser(file).parse()
   }
@@ -36,9 +38,13 @@ object Scratch extends App with GenerateData with JavaLogging {
 
   // TODO: Akka OOM
 
-  timed("Future threaded") {
-    // OOM!
-    new FutureThreadParser(file).parse()
+//  timed("Future threaded") {
+//    // OOM!
+//    new FutureThreadParser(file).parse()
+//  }
+
+  timed("observable") {
+    new ObservableParser(file).parse()
   }
 
 }
@@ -86,12 +92,12 @@ trait ParseTest {
     val bits = line.split(",")
     val b = bits(1).toInt
     val c = bits(2).toDouble
-    //    Thread.sleep(5)
 
+//    Thread.sleep(1)
 
     val done = count.incrementAndGet()
-    if (done % 100000 == 0)
-      println("done " + done)
+//    if (done % 100000 == 0)
+//      println("done " + done)
   }
 
 }
@@ -142,20 +148,16 @@ class ThrottledFutureThreadParser(val file: File) extends Parser with ThrottledF
 }
 
 class ObservableParser(val file: File) extends ParseTest {
-  import rx.observables.StringObservable._
-
   private val latch = new CountDownLatch(1)
 
   override def parse() = {
-    split(from(new FileReader(file)), "\n").subscribe(new Observer[String]{
-      override def onNext(t: String) = parseLine(t)
-      override def onError(e: Throwable) = ???
-      override def onCompleted() = {
-        // FIXME: this is never called
-        println("the final countdown")
-        latch.countDown()
-      }
-    })
+    toScalaObservable(split(from(newReader(file, UTF_8)), "\n")).
+//      parallel(t => t).
+      subscribe(
+      onNext = parseLine,
+      onError = e => ???,
+      onCompleted = () => latch.countDown()
+    )
     latch.await()
   }
 }
