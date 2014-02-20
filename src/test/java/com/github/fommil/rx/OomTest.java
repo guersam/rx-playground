@@ -5,31 +5,25 @@ import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Func1;
 
-import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static rx.Observable.OnSubscribe;
 import static rx.Observable.create;
 
 
-/**
- * Must be run with a ridiculously low heap size, e.g.
- * {@code -Xmx5m}.
- */
 public class OomTest {
 
-    private Observable<Integer> ob = create(new OnSubscribe<Integer>() {
+    private Observable<Long[]> ob = create(new OnSubscribe<Long[]>() {
         @Override
-        public void call(Subscriber<? super Integer> subscriber) {
-            Random random = new Random();
+        public void call(Subscriber<? super Long[]> subscriber) {
             while (!subscriber.isUnsubscribed()) {
-                subscriber.onNext(random.nextInt());
+                subscriber.onNext(new Long[10 * 1024 * 1024]);
             }
             subscriber.onCompleted();
         }
     });
 
-    static class IntSubscriber extends Subscriber<Integer> {
+    static class IntSubscriber extends Subscriber<Long[]> {
         private final AtomicLong count = new AtomicLong();
         private final long delay;
 
@@ -46,7 +40,7 @@ public class OomTest {
         }
 
         @Override
-        public void onNext(Integer integer) {
+        public void onNext(Long[] next) {
             long seen = count.getAndIncrement();
             if (seen > 0 && seen % 1000 == 0) {
                 System.out.println("seen " + seen);
@@ -68,9 +62,9 @@ public class OomTest {
 
     @Test
     public void testInfiniteSourceWithParallel() throws Exception {
-        Observable<Integer> parallel = ob.parallel(new Func1<Observable<Integer>, Observable<Integer>>() {
+        Observable<Long[]> parallel = ob.parallel(new Func1<Observable<Long[]>, Observable<Long[]>>() {
             @Override
-            public Observable<Integer> call(Observable<Integer> integerObservable) {
+            public Observable<Long[]> call(Observable<Long[]> integerObservable) {
                 return integerObservable;
             }
         });
