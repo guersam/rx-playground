@@ -32,9 +32,14 @@ object Scratch extends App with GenerateData with JavaLogging {
     new SingleThreadParser(file).parse()
   }
 
-  timed("Throttled Future threaded") {
-    new ThrottledFutureThreadParser(file).parse()
+  timed("producer observable") {
+    new ProducerObservableParser(file).parse()
   }
+
+
+//  timed("Throttled Future threaded") {
+//    new ThrottledFutureThreadParser(file).parse()
+//  }
 
   // TODO: Akka OOM
 
@@ -43,9 +48,9 @@ object Scratch extends App with GenerateData with JavaLogging {
 //    new FutureThreadParser(file).parse()
 //  }
 
-  timed("observable") {
-    new ObservableParser(file).parse()
-  }
+//  timed("observable") {
+//    new ObservableParser(file).parse()
+//  }
 
 }
 
@@ -65,7 +70,7 @@ trait GenerateData {
 }
 
 object GenerateData {
-  val rows = 10000000
+  val rows = 10000
 }
 
 trait ThrottledFutureSupport {
@@ -93,11 +98,11 @@ trait ParseTest {
     val b = bits(1).toInt
     val c = bits(2).toDouble
 
-//    Thread.sleep(1)
+    Thread.sleep(1)
 
     val done = count.incrementAndGet()
-//    if (done % 100000 == 0)
-//      println("done " + done)
+    if (done % 1000 == 0)
+      println("done " + done)
   }
 
 }
@@ -160,4 +165,30 @@ class ObservableParser(val file: File) extends ParseTest {
     )
     latch.await()
   }
+}
+
+class ProducerObservableParser(val file: File) extends ParseTest {
+  private val latch = new CountDownLatch(1)
+
+
+  override def parse() = {
+    val lines = Source.fromFile(file).getLines()
+
+    class Producer extends BlockingProducer[String] {
+      override def next() = {
+        if (!lines.hasNext) throw new NoSuchElementException
+        else lines.next()
+      }
+    }
+
+    ProducerObservable.from(new Producer).
+      subscribe(
+        onNext = parseLine,
+        onError = e => ???,
+        onCompleted = () => latch.countDown()
+      )
+    latch.await()
+  }
+
+
 }
