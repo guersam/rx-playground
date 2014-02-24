@@ -28,9 +28,9 @@ object Scratch extends App with GenerateData with JavaLogging {
   val file = new File("data.csv")
   generate(file)
 
-  timed("single threaded") {
-    new SingleThreadParser(file).parse()
-  }
+//  timed("single threaded") {
+//    new SingleThreadParser(file).parse()
+//  }
 
   timed("producer observable") {
     new ProducerObservableParser(file).parse()
@@ -98,7 +98,7 @@ trait ParseTest {
     val b = bits(1).toInt
     val c = bits(2).toDouble
 
-    Thread.sleep(1)
+    Thread.sleep(10)
 
     val done = count.incrementAndGet()
     if (done % 1000 == 0)
@@ -170,7 +170,6 @@ class ObservableParser(val file: File) extends ParseTest {
 class ProducerObservableParser(val file: File) extends ParseTest {
   private val latch = new CountDownLatch(1)
 
-
   override def parse() = {
     val lines = Source.fromFile(file).getLines()
 
@@ -189,6 +188,5 @@ class ProducerObservableParser(val file: File) extends ParseTest {
       )
     latch.await()
   }
-
 
 }
