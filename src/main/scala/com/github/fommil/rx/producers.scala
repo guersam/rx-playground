@@ -31,6 +31,14 @@ object ProducerObservable {
       override def call(s: Subscriber[_ >: T]) = work(s)
     }))
 
+  class State[T] {
+    // we need to access values as mutable references
+    var producing: Boolean = false
+    var exhausted: Boolean = false
+    var consuming: Int = 0
+    val buffer = mutable.Queue.empty[T]
+  }
+
   /*
     This Observable may serve events in parallel to a sole Subscriber.
     Unsubscription may result in obtaining results from the producer that are never
@@ -43,18 +51,11 @@ object ProducerObservable {
     require(maxConcurrency >= 1)
     create { subscriber =>
 
-    // TODO: repackage these mutables
-    // in lieu of atomic compareTo
-      val lock = new Lock
-      // we need to access values as mutable references
-      val producing = new AtomicBoolean
-      val consuming = new AtomicInteger
-      val exhausted = new AtomicBoolean
-      val buffer = mutable.Queue.empty[T]
+      val state = new State[T]
 
       (1 to maxConcurrency) foreach { _ =>
         Future {
-          decide[T](producer, lock, producing, consuming, exhausted, buffer, subscriber, maxConcurrency, maxBuffer)
+          decide[T](producer, subscriber, maxConcurrency, maxBuffer, state)
         }
       }
     }
@@ -65,9 +66,8 @@ object ProducerObservable {
 
   private case object Produce extends Decision
 
+  @deprecated
   private case class Consume[T](entity: T) extends Decision
-
-  private case class SpawnConsume(count: Int) extends Decision
 
   private case object Rest extends Decision
 
@@ -86,28 +86,24 @@ object ProducerObservable {
 
    */
   private def decide[T](producer: BlockingProducer[T],
-                        lock: Lock,
-                        producing: AtomicBoolean,
-                        consuming: AtomicInteger,
-                        exhausted: AtomicBoolean,
-                        buffer: mutable.Queue[T],
                         subscriber: Subscriber[_ >: T],
                         maxConcurrency: Int,
-                        maxBuffer: Int)
+                        maxBuffer: Int,
+                        state: State[T])
                        (implicit ctx: ExecutionContext) {
 
     // TODO: this bit without a lock would be awesome
-    val choice: Decision = lock synchronized {
+    val choice: Decision = state synchronized {
       if (subscriber.isUnsubscribed) Rest
-      else if (exhausted.get && buffer.isEmpty) {
+      else if (state.exhausted && state.buffer.isEmpty) {
         subscriber.onCompleted()
         Rest
-      } else if (!exhausted.get && !producing.get && buffer.size < maxBuffer) {
-        producing set true
+      } else if (!state.exhausted && !state.producing && state.buffer.size < maxBuffer) {
+        state.producing = true
         Produce
-      } else if (!buffer.isEmpty && consuming.get <= maxConcurrency) {
-        consuming.getAndIncrement()
-        Consume(buffer.dequeue())
+      } else if (!state.buffer.isEmpty && state.consuming <= maxConcurrency) {
+        state.consuming += 1
+        Consume(state.buffer.dequeue())
       } else {
         Rest
       }
@@ -115,49 +111,45 @@ object ProducerObservable {
 
     // TODO: fix superfluous Rests... they should be a small proportion of decisions
 
-    if (choice eq Rest)
+    val spawn: Int = if (choice eq Rest) {
 //    if ((choice eq Produce) || choice.isInstanceOf[Consume[_]])
-      println(s"$choice $producing $consuming from ${buffer.size} $exhausted")
-
-    if (choice eq Produce) {
+      println(s"$choice ${state.producing} ${state.consuming} from ${state.buffer.size} ${state.exhausted}")
+      0
+    } else if (choice eq Produce) {
       try {
         // blocking :-(
         val entity = producer.next()
-        lock synchronized {
-          buffer.enqueue(entity)
-          producing set false
+        state synchronized {
+          state.buffer.enqueue(entity)
+          state.producing = false
+          1 + (if (state.consuming > 1) 0 else 1)
         }
       } catch {
         case e: NoSuchElementException =>
-          lock synchronized {
-            exhausted set true
-            producing set false
+          state synchronized {
+            state.exhausted = true
+            state.producing = false
+            if (state.consuming > 0) 0 else 1
           }
         case e: IOException if !subscriber.isUnsubscribed =>
           subscriber.onError(e)
+          1
       }
-    }
-
-    else if (choice.isInstanceOf[Consume[_]]) {
+    } else {
       val entity = choice.asInstanceOf[Consume[T]]
       if (!subscriber.isUnsubscribed)
         subscriber.onNext(entity.entity)
-      lock synchronized {
-        consuming.getAndDecrement()
+      state synchronized {
+        state.consuming -= 1
       }
+      if (state.consuming < maxConcurrency) 2 else 1
     }
 
-
-    val spawn = lock synchronized {
-      val potential = 0 max (buffer.size min (maxConcurrency - consuming.get - 1))
-      if (potential == 0 && !producing.get && consuming.get == 0) 1
-      else potential
-    }
     if (spawn > 0) {
       (1 to spawn) foreach { _ =>
         Future {
           // work is rescheduled as Future, rather than recursive
-          decide[T](producer, lock, producing, consuming, exhausted, buffer, subscriber, maxConcurrency, maxBuffer)
+          decide[T](producer, subscriber, maxConcurrency, maxBuffer, state)
         }
       }
     }
