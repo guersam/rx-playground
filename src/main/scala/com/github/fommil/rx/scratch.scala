@@ -15,6 +15,8 @@ import Files.newReader
 import Charsets.UTF_8
 import JavaConversions._
 import rx.observables.StringObservable._
+import scalaz.stream._
+import scalaz.concurrent.Task
 
 
 object Scratch extends App with GenerateData with JavaLogging {
@@ -36,12 +38,15 @@ object Scratch extends App with GenerateData with JavaLogging {
     new ProducerObservableParser(file).parse()
   }
 
+  timed("scalaz streams") {
+    new ScalazStreamsParser(file).parse()
+  }
 
 //  timed("Throttled Future threaded") {
 //    new ThrottledFutureThreadParser(file).parse()
 //  }
 
-  // TODO: Akka OOM
+// TODO: Akka OOM. No point even writing it as a showcase.
 
 //  timed("Future threaded") {
 //    // OOM!
@@ -92,8 +97,7 @@ trait ParseTest {
 
   private val count = new AtomicLong
 
-  protected def parseLine(line: String) = {
-    //    val watch = Stopwatch.createStarted()
+  protected def parseLine(line: String): Long = {
     val bits = line.split(",")
     val b = bits(1).toInt
     val c = bits(2).toDouble
@@ -103,6 +107,7 @@ trait ParseTest {
     val done = count.incrementAndGet()
     if (done % 1000 == 0)
       println("done " + done)
+    done
   }
 
 }
@@ -124,8 +129,9 @@ trait Parser extends ParseTest {
 
   // simulates low CPU per-line processing
   protected override def parseLine(line: String) = {
-    super.parseLine(line)
+    val res = super.parseLine(line)
     latch.countDown()
+    res
   }
 
 }
@@ -157,7 +163,7 @@ class ObservableParser(val file: File) extends ParseTest {
 
   override def parse() = {
     toScalaObservable(split(from(newReader(file, UTF_8)), "\n")).
-//      parallel(t => t).
+//      parallel(t => t). // ===> OOM
       subscribe(
       onNext = parseLine,
       onError = e => ???,
@@ -189,4 +195,23 @@ class ProducerObservableParser(val file: File) extends ParseTest {
     latch.await()
   }
 
+}
+
+// Lots of potential, but just not performant :-(
+// is it running stuff in parallel?
+class ScalazStreamsParser(file: File) extends ParseTest {
+  val lines: Process[Task, String] = io.linesR(file.getAbsolutePath)
+
+  def process(line: String): Process[Task, Long] = Process{
+    parseLine(line)
+  }
+
+  val consumers: Process[Task, Process[Task, Long]] = lines.map(process)
+
+  val results: Process[Task, Long] =
+    nondeterminism.njoin(maxOpen = 50, maxQueued = 100)(consumers)
+
+  def parse(): Unit = {
+    results.run.run
+  }
 }
