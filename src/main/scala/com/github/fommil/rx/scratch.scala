@@ -1,9 +1,9 @@
 package com.github.fommil.rx
 
-import java.io.{FileWriter, File}
-import scala.concurrent.{Future, ExecutionContext}
-import java.util.concurrent.{CountDownLatch, Semaphore}
-import com.google.common.base.{Charsets, Stopwatch}
+import java.io.{ FileWriter, File }
+import scala.concurrent.{ Future, ExecutionContext }
+import java.util.concurrent.{ CountDownLatch, Semaphore }
+import com.google.common.base.{ Charsets, Stopwatch }
 import akka.contrib.jul.JavaLogging
 import scala.io.Source
 import java.util.concurrent.atomic.AtomicLong
@@ -18,7 +18,6 @@ import rx.observables.StringObservable._
 import scalaz.stream._
 import scalaz.concurrent.Task
 
-
 object Scratch extends App with GenerateData with JavaLogging {
 
   def timed[T <: AnyRef](text: String)(f: => Unit) {
@@ -30,9 +29,9 @@ object Scratch extends App with GenerateData with JavaLogging {
   val file = new File("data.csv")
   generate(file)
 
-//  timed("single threaded") {
-//    new SingleThreadParser(file).parse()
-//  }
+  //  timed("single threaded") {
+  //    new SingleThreadParser(file).parse()
+  //  }
 
   timed("producer observable") {
     new ProducerObservableParser(file).parse()
@@ -42,23 +41,22 @@ object Scratch extends App with GenerateData with JavaLogging {
     new ScalazStreamsParser(file).parse()
   }
 
-//  timed("Throttled Future threaded") {
-//    new ThrottledFutureThreadParser(file).parse()
-//  }
+  //  timed("Throttled Future threaded") {
+  //    new ThrottledFutureThreadParser(file).parse()
+  //  }
 
-// TODO: Akka OOM. No point even writing it as a showcase.
+  // TODO: Akka OOM. No point even writing it as a showcase.
 
-//  timed("Future threaded") {
-//    // OOM!
-//    new FutureThreadParser(file).parse()
-//  }
+  //  timed("Future threaded") {
+  //    // OOM!
+  //    new FutureThreadParser(file).parse()
+  //  }
 
-//  timed("observable") {
-//    new ObservableParser(file).parse()
-//  }
+  //  timed("observable") {
+  //    new ObservableParser(file).parse()
+  //  }
 
 }
-
 
 trait GenerateData {
 
@@ -90,7 +88,6 @@ trait ThrottledFutureSupport {
     }
   }
 }
-
 
 trait ParseTest {
   def parse()
@@ -163,12 +160,12 @@ class ObservableParser(val file: File) extends ParseTest {
 
   override def parse() = {
     toScalaObservable(split(from(newReader(file, UTF_8)), "\n")).
-//      parallel(t => t). // ===> OOM
+      //      parallel(t => t). // ===> OOM
       subscribe(
-      onNext = parseLine,
-      onError = e => ???,
-      onCompleted = () => latch.countDown()
-    )
+        onNext = parseLine,
+        onError = e => ???,
+        onCompleted = () => latch.countDown()
+      )
     latch.await()
   }
 }
@@ -202,16 +199,12 @@ class ProducerObservableParser(val file: File) extends ParseTest {
 class ScalazStreamsParser(file: File) extends ParseTest {
   val lines: Process[Task, String] = io.linesR(file.getAbsolutePath)
 
-  def process(line: String): Process[Task, Long] = Process{
-    parseLine(line)
-  }
+  def process(line: String): Process[Task, Long] = Process(parseLine(line))
 
   val consumers: Process[Task, Process[Task, Long]] = lines.map(process)
 
   val results: Process[Task, Long] =
     nondeterminism.njoin(maxOpen = 50, maxQueued = 100)(consumers)
 
-  def parse(): Unit = {
-    results.run.run
-  }
+  def parse(): Unit = results.run.run
 }

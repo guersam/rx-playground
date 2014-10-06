@@ -1,3 +1,9 @@
+import LionPlugin._
+
+lionRuns := 0
+
+lionAllocRuns := 1
+
 name := "rx-playground"
 
 version := "1.0-SNAPSHOT"
