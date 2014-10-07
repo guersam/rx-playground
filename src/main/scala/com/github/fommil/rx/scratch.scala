@@ -76,7 +76,7 @@ trait GenerateData {
 }
 
 object GenerateData {
-  val rows = 100000
+  val rows = 10000
 }
 
 trait ThrottledFutureSupport {
@@ -209,7 +209,8 @@ class ScalazStreamsParser(file: File) extends ParseTest {
   val lines: Process[Task, String] = io.linesR(file.getAbsolutePath)
 
   def process(line: String): Process[Task, Long] =
-    Process.eval(Task.delay(parseLine(line)))
+    Process.suspend(Process(parseLine(line)))
+//  Process.eval(Task.delay(parseLine(line)))
 
   val consumers: Process[Task, Process[Task, Long]] = lines.map(process)
 
