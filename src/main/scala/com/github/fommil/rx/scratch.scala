@@ -3,6 +3,8 @@ package com.github.fommil.rx
 import java.io.{ FileWriter, File }
 import java.util.concurrent.Executors
 import java.util.concurrent.ForkJoinPool
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 import scala.concurrent.{ Future, ExecutionContext }
 import java.util.concurrent.{ CountDownLatch, Semaphore }
 import com.google.common.base.{ Charsets, Stopwatch }
@@ -200,11 +202,20 @@ class ProducerObservableParser(val file: File) extends ParseTest {
 }
 
 class ScalazStreamsParser(file: File) extends ParseTest {
- implicit val concurrency: Strategy = Strategy.Executor(
-   new ForkJoinPool() // TODO: use the global fork/join
+
+  def strategy(ex: ExecutionContext) = new Strategy {
+    def apply[A](a: => A) = {
+      val f = Future(a)
+      () => Await.result(f, Duration.Inf)
+    }
+  }
+
+  implicit val concurrency: Strategy = strategy(concurrent.ExecutionContext.global)
+  //Strategy.Executor(
+//   new ForkJoinPool(Runtime.getRuntime.availableProcessors * 4) // TODO: use the global fork/join
 //   Executors.newCachedThreadPool()
 //   Executors.newFixedThreadPool(16)
- )
+// )
 
   val lines: Process[Task, String] = io.linesR(file.getAbsolutePath)
 
