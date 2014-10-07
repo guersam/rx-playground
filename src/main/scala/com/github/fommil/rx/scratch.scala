@@ -199,8 +199,6 @@ class ProducerObservableParser(val file: File) extends ParseTest {
 
 }
 
-// Lots of potential, but just not performant :-(
-// is it running stuff in parallel?
 class ScalazStreamsParser(file: File) extends ParseTest {
  implicit val concurrency: Strategy = Strategy.Executor(
    new ForkJoinPool() // TODO: use the global fork/join
