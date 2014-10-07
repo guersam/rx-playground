@@ -1,31 +1,31 @@
-import LionPlugin._
+// import LionPlugin._
 
-lionRuns := 0
+// lionRuns := 0
 
-lionAllocRuns := 1
+// lionAllocRuns := 1
 
-lionAllocTrace := Map (
-  "java/util/regex/Pattern$GroupHead" -> 1048576,
-  "java/util/regex/Pattern" -> 1048576,
-  "scala/concurrent/impl/ExecutionContextImpl$DefaultThreadFactory$$anon$2$$anon$5" -> 1048576,
-  "char" ->  1048576,
-  "scala/concurrent/forkjoin/ForkJoinTask" -> 1048576,
-  "java/util/regex/Matcher" -> 1048576,
-  "int" -> 1048576,
-  "java/lang/String" -> 1048576,
-  "byte" -> 1048576,
-  "java/lang/Object" -> 1048576,
-  "scala/runtime/ObjectRef" -> 1048576,
-  "scalaz/std/FunctionInstances$$anon$1$$anonfun$map$1" -> 1048576,
-  "scalaz/$minus$bslash$div" -> 1048576,
-  "scalaz/Free$$anonfun$flatMap$2" -> 1048576,
-  "scalaz/Free$$anon$3" -> 1048576,
-  "scalaz/stream/Process$Append" -> 1048576,
-  "scala/collection/immutable/VectorBuilder" -> 1048576,
-  "scala/collection/immutable/Vector" -> 1048576,
-  "scala/collection/immutable/VectorIterator" -> 1048576,
-  "scalaz/Free$Return" -> 1048576
-)
+// lionAllocTrace := Map (
+//   "java/util/regex/Pattern$GroupHead" -> 1048576,
+//   "java/util/regex/Pattern" -> 1048576,
+//   "scala/concurrent/impl/ExecutionContextImpl$DefaultThreadFactory$$anon$2$$anon$5" -> 1048576,
+//   "char" ->  1048576,
+//   "scala/concurrent/forkjoin/ForkJoinTask" -> 1048576,
+//   "java/util/regex/Matcher" -> 1048576,
+//   "int" -> 1048576,
+//   "java/lang/String" -> 1048576,
+//   "byte" -> 1048576,
+//   "java/lang/Object" -> 1048576,
+//   "scala/runtime/ObjectRef" -> 1048576,
+//   "scalaz/std/FunctionInstances$$anon$1$$anonfun$map$1" -> 1048576,
+//   "scalaz/$minus$bslash$div" -> 1048576,
+//   "scalaz/Free$$anonfun$flatMap$2" -> 1048576,
+//   "scalaz/Free$$anon$3" -> 1048576,
+//   "scalaz/stream/Process$Append" -> 1048576,
+//   "scala/collection/immutable/VectorBuilder" -> 1048576,
+//   "scala/collection/immutable/Vector" -> 1048576,
+//   "scala/collection/immutable/VectorIterator" -> 1048576,
+//   "scalaz/Free$Return" -> 1048576
+// )
 
 name := "rx-playground"
 
@@ -52,3 +52,5 @@ libraryDependencies ++= List(
 )
 
 net.virtualvoid.sbt.graph.Plugin.graphSettings
+
+fork := true

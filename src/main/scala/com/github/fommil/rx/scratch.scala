@@ -1,6 +1,8 @@
 package com.github.fommil.rx
 
 import java.io.{ FileWriter, File }
+import java.util.concurrent.Executors
+import java.util.concurrent.ForkJoinPool
 import scala.concurrent.{ Future, ExecutionContext }
 import java.util.concurrent.{ CountDownLatch, Semaphore }
 import com.google.common.base.{ Charsets, Stopwatch }
@@ -15,6 +17,7 @@ import Files.newReader
 import Charsets.UTF_8
 import JavaConversions._
 import rx.observables.StringObservable._
+import scalaz.concurrent.Strategy
 import scalaz.stream._
 import scalaz.concurrent.Task
 
@@ -33,9 +36,9 @@ object Scratch extends App with GenerateData with JavaLogging {
   //    new SingleThreadParser(file).parse()
   //  }
 
-  timed("producer observable") {
-    new ProducerObservableParser(file).parse()
-  }
+  // timed("producer observable") {
+  //   new ProducerObservableParser(file).parse()
+  // }
 
   timed("scalaz streams") {
     new ScalazStreamsParser(file).parse()
@@ -73,7 +76,7 @@ trait GenerateData {
 }
 
 object GenerateData {
-  val rows = 10000
+  val rows = 100000
 }
 
 trait ThrottledFutureSupport {
@@ -99,7 +102,9 @@ trait ParseTest {
     val b = bits(1).toInt
     val c = bits(2).toDouble
 
+//    println("starting to sleep")
     Thread.sleep(10)
+//    println("waking up")
 
     val done = count.incrementAndGet()
     if (done % 1000 == 0)
@@ -197,14 +202,21 @@ class ProducerObservableParser(val file: File) extends ParseTest {
 // Lots of potential, but just not performant :-(
 // is it running stuff in parallel?
 class ScalazStreamsParser(file: File) extends ParseTest {
+ implicit val concurrency: Strategy = Strategy.Executor(
+   new ForkJoinPool() // TODO: use the global fork/join
+//   Executors.newCachedThreadPool()
+//   Executors.newFixedThreadPool(16)
+ )
+
   val lines: Process[Task, String] = io.linesR(file.getAbsolutePath)
 
-  def process(line: String): Process[Task, Long] = Process(parseLine(line))
+  def process(line: String): Process[Task, Long] =
+    Process.eval(Task.delay(parseLine(line)))
 
   val consumers: Process[Task, Process[Task, Long]] = lines.map(process)
 
   val results: Process[Task, Long] =
     nondeterminism.njoin(maxOpen = 50, maxQueued = 100)(consumers)
-
+ 
   def parse(): Unit = results.run.run
 }
