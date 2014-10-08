@@ -205,17 +205,10 @@ class ScalazStreamsParser(file: File) extends ParseTest {
 
   def strategy(ex: ExecutionContext) = new Strategy {
     def apply[A](a: => A) = {
-      val f = Future(a)
+      val f = Future(a)(ex)
       () => Await.result(f, Duration.Inf)
     }
   }
-
-  implicit val concurrency: Strategy = strategy(concurrent.ExecutionContext.global)
-  //Strategy.Executor(
-//   new ForkJoinPool(Runtime.getRuntime.availableProcessors * 4) // TODO: use the global fork/join
-//   Executors.newCachedThreadPool()
-//   Executors.newFixedThreadPool(16)
-// )
 
   val lines: Process[Task, String] = io.linesR(file.getAbsolutePath)
 
