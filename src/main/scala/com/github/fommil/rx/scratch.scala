@@ -204,11 +204,13 @@ class ProducerObservableParser(val file: File) extends ParseTest {
 class ScalazStreamsParser(file: File) extends ParseTest {
 
   def strategy(ex: ExecutionContext) = new Strategy {
-    def apply[A](a: => A) = {
+    def apply[A](a: => A): () => A = {
       val f = Future(a)(ex)
-      () => Await.result(f, Duration.Inf)
+      () => {Await.result(f, Duration.Inf)}
     }
   }
+
+  implicit val Global = strategy(concurrent.ExecutionContext.global)
 
   val lines: Process[Task, String] = io.linesR(file.getAbsolutePath)
 
